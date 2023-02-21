@@ -1,274 +1,207 @@
-import React, { useState, useEffect } from "react";
-import { Octokit } from "@octokit/core";
-import { makeStyles } from '@material-ui/core/styles';
-import CodeIcon from '@material-ui/icons/Code';
-import Dialog from '@material-ui/core/Dialog';
-import DialogTitle from '@material-ui/core/DialogTitle';
-import DialogContent from '@material-ui/core/DialogContent';
-import DialogActions from '@material-ui/core/DialogActions';
-import {
-  Container,
-  Grid,
-  Paper,
-  Typography,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
-  CircularProgress,
-  Button,
-  
-} from '@material-ui/core';
-
-const octokit = new Octokit({
-  auth: "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",
-});
-
-const useStyles = makeStyles((theme) => ({
-  root: {
-    flexGrow: 1,
-    marginTop: theme.spacing(4),
-  },
-  paper: {
-    padding: theme.spacing(2),
-    textAlign: 'center',
-    color: theme.palette.text.secondary,
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-  },
-  list: {
-    maxHeight: 500,
-    overflow: 'auto',
-    flexGrow: 1,
-  },
-  modal: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 1000,
-    minHeight: 1000,
-  },
-  modalContent: {
-    backgroundColor: theme.palette.background.paper,
-    border: '10px solid #0d3c73',
-    boxShadow: theme.shadows[5],
-    padding: theme.spacing(2, 4, 3),
-    minWidth: 1000,
-    minHeight: 1000,
-  },
-  closeButton: {
-    marginTop: theme.spacing(2),
-  },
-  title: {
-    flexGrow: 1,
-  },
-  listItem: {
-    borderBottom: '2px solid #0d3c73',
-    '&:hover': {
-      backgroundColor: '#0d3c73',
-      cursor: 'pointer',
-    },
-  },
-  listItemText: {
-    display: 'flex',
-    justifyContent: 'space-between',
-  },
-  loader: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 500,
-  },
-  formControl: {
-    minWidth: 150,
-    marginRight: theme.spacing(2),
-  },
-}));
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Octokit } from "@octokit/rest";
+import { XTerm } from 'xterm-for-react'
+import { FitAddon } from 'xterm-addon-fit';
 
 function App() {
-  const handleCloseBranchesDialog = () => {
-    setOpen(false);
-  };
-  
-  const handleOpenBranchesDialog = (repoFullName) => {
-    // code to handle opening the branches dialog for the given repository
-  };
-  const classes = useStyles();
-  const [repos, setRepos] = useState([]);
-  const [selectedRepo, setSelectedRepo] = useState(null);
-  const [open, setOpen] = useState(false);
+  const [repositories, setRepositories] = useState([]);
+  const [selectedRepository, setSelectedRepository] = useState(null);
   const [branches, setBranches] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [sortBy, setSortBy] = useState('name');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState(null);
+  const [workflowRuns, setWorkflowRuns] = useState([]);
+  const xtermRef = React.useRef(null)
+  // Fetch the user's repositories on component mount
+  useEffect(() => {
+    // You can call any method in XTerm.js by using 'xterm xtermRef.current.terminal.[What you want to call]
+    xtermRef.current.terminal.writeln("Hello, World!")
+}, [])
+
+ // Fetch the workflow runs for the repository on component mount
+ useEffect(() => {
+  axios.get('https://api.github.com/repos/Mondher19/Build/actions/runs', {
+    headers: {
+      Authorization: `Bearer ${"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"}`,
+    },
+  })
+  .then(response => {
+    setWorkflowRuns(response.data.workflow_runs);
+
+  })
+  .catch(error => {
+    console.log(error);
+  });
+}, []);
+
 
   useEffect(() => {
-    async function fetchRepos() {
-      try {
-        const { data } = await octokit.request("GET /user/repos", {});
-        setRepos(data);
-      } catch (error) {
-        console.error(error);
-      }
-    }
-    fetchRepos();
+    axios.get('https://api.github.com/user/repos', {
+      headers: {
+        Authorization: `Bearer ${"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"}`,
+      },
+    })
+    .then(response => {
+      setRepositories(response.data);
+    })
+    .catch(error => {
+      console.log(error);
+    });
   }, []);
+
+  //Artifacts 
+
+  const [artifacts, setArtifacts] = useState([]);
+  const artifactId = artifacts.data[0].id;
+
   useEffect(() => {
-    async function fetchBranches() {
-      if (selectedRepo) {
-        setIsLoading(true);
-        try {
-          const { data } = await octokit.request(
-            `GET /repos/${selectedRepo}/branches`,
-            {}
-          );
-          setBranches(data);
-          setOpen(true);
-        } catch (error) {
-          console.error(error);
-        } finally {
-          setIsLoading(false);
+    async function fetchArtifacts() {
+      const artifactId = artifacts.data[0]["id"]
+      const octokit = new Octokit({
+        auth: "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",
+      });
+     
+      const { data } = await octokit.actions.listWorkflowRunArtifacts({
+        owner: "Mondher19",
+        repo: "Build",
+        run_id: WORKFLOW_RUN_ID,
+      });
+      setArtifacts(data);
+    }
+    fetchArtifacts();
+  }, ["Mondher19", "Build", WORKFLOW_RUN_ID, "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"]);
+
+
+  // Fetch the branches of the selected repository
+  useEffect(() => {
+    if (selectedRepository) {
+      axios.get(`https://api.github.com/repos/${selectedRepository.full_name}/branches`, {
+        headers: {
+          Authorization: `Bearer ${"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"}`,
+        },
+      })
+      .then(response => {
+        setBranches(response.data);
+      })
+      .catch(error => {
+        console.log(error);
+      });
+    }
+  }, [selectedRepository]);
+
+  const handleRepositoryChange = (event) => {
+    const repository = repositories.find(r => r.full_name === event.target.value);
+    setSelectedRepository(repository);
+    setSelectedBranch(null);
+  }
+
+  const handleBranchChange = (event) => {
+    const branch = branches.find(b => b.name === event.target.value);
+    setSelectedBranch(branch);
+  }
+
+  const handleBuildClick = () => {
+    if (selectedBranch) {
+      console.log(`Building ${selectedRepository.full_name}#${selectedBranch.name}`);
+  
+      axios.post(`https://api.github.com/repos/${selectedRepository.full_name}/actions/workflows/android-ci.yml/dispatches`, {
+        ref: selectedBranch.name,
+       
+      }, {
+        headers: {
+          Authorization: `Bearer ${"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"}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      })
+      .then(response => {
+        console.log(response);
+        if (response.status === 204) {
+          alert("build");
+        } else {
+          alert("response");
         }
-      } else {
-        setOpen(false);
-      }
+      })
+      .catch(error => {
+        console.log("text");
+        alert(error);
+      });
     }
-    fetchBranches();
-  }, [selectedRepo]);
-  
-  function handleSortByChange(event) {
-    setSortBy(event.target.value);
   }
   
-  function handleSearchQueryChange(event) {
-    setSearchQuery(event.target.value);
-  }
-
-  function handleClose() {
-    setOpen(false);
-  }
-
-  function sortRepos(repos) {
-    return [...repos].sort((a, b) => {
-      if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
-      } else if (sortBy === 'stars') {
-        return b.stargazers_count - a.stargazers_count;
-      } else if (sortBy === 'forks') {
-        return b.forks_count - a.forks_count;
-      }
-    });
-  }
-
-  function filterRepos(repos) {
-    if (searchQuery === '') {
-      return repos;
-    }
-    const lowerCaseQuery = searchQuery.toLowerCase();
-    return repos.filter(repo => {
-      return repo.name.toLowerCase().includes(lowerCaseQuery) ||
-             repo.description.toLowerCase().includes(lowerCaseQuery) ||
-             repo.language.toLowerCase().includes(lowerCaseQuery);
-    });
-  }
-
-  const sortedRepos = sortRepos(repos);
-  const filteredRepos = filterRepos(sortedRepos);
+  
 
   return (
-    <Container maxWidth="lg" className={classes.root}>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Paper className={classes.paper} style={{ backgroundColor: '#0d47a1' }}>
-            <Typography variant="h3" className={classes.title} style={{ color: '#fff' }}>
-              Your  Repositories
-            </Typography>
-          </Paper>
-        </Grid>
-        <Grid item xs={12}>
-          <Paper className={classes.paper} style={{ backgroundColor: '#fff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                
-              </div>
-              <div>
-                <TextField
-                  label="Search"
-                  variant="outlined"
-                  size="small"
-                  value={searchQuery}
-                  onChange={handleSearchQueryChange}
-                  style={{ marginRight: 8 ,  minWidth: 800 }}
-                 
-                  
-                />
-                <FormControl>
-                  <InputLabel id="sort-by-label">Sort by</InputLabel>
-                  <Select
-                    labelId="sort-by-label"
-                    value={sortBy}
-                    onChange={handleSortByChange}
-                    style={{ minWidth: 200 }}
-                  >
-                    <MenuItem value="name">Name</MenuItem>
-                    <MenuItem value="stars">Stars</MenuItem>
-                    <MenuItem value="forks">Forks</MenuItem>
-                  </Select>
-                </FormControl>
-              </div>
-            </div>
-            {isLoading ? (
-              <CircularProgress />
-            ) : (
-              <List className={classes.list}>
-                {filteredRepos.map((repo) => (
-                  <ListItem
-  button
-  key={repo.id}
-  onClick={() => setSelectedRepo(repo.full_name)}
-  selected={selectedRepo === repo.full_name}
->
-  <ListItemText primary={repo.full_name} />
-  <ListItemSecondaryAction>
-    <IconButton onClick={() => handleOpenBranchesDialog(repo.full_name)}>
-      <CodeIcon />
-    </IconButton>
-  </ListItemSecondaryAction>
-</ListItem>
-))}
-              </List>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-      <Dialog open={open} onClose={handleCloseBranchesDialog}>
-    <DialogTitle>Branches</DialogTitle>
-    <DialogContent>
-      <List>
-        {branches.map((branch) => (
-          <ListItem button key={branch.name}>
-            <ListItemText primary={branch.name} />
-          </ListItem>
+
+    
+    <div>
+      <h1>Build GitHub Branch</h1>
+
+      <label htmlFor="repository-select">Repository:</label>
+      <select id="repository-select" onChange={handleRepositoryChange}>
+        <option value="">Select a repository</option>
+        {repositories.map(repository => (
+          <option key={repository.id} value={repository.full_name}>{repository.full_name}</option>
         ))}
-      </List>
-    </DialogContent>
-    <DialogActions>
-      <Button onClick={handleCloseBranchesDialog} color="primary">
-        Close
-      </Button>
-    </DialogActions>
-  </Dialog>
-</Container>
-);
+      </select>
+
+      {selectedRepository && (
+        <div>
+          <label htmlFor="branch-select">Branch:</label>
+          <select id="branch-select" onChange={handleBranchChange}>
+            <option value="">Select a branch</option>
+            {branches.map(branch => (
+              <option key={branch.name} value={branch.name}>{branch.name}</option>
+            ))}
+          </select>
+
+          {selectedBranch && (
+            <div>
+              <p>Selected branch: {selectedBranch.name}</p>
+              <button onClick={handleBuildClick}>Build</button>
+            </div>
+          )}
+        </div>
+      )}
+      <XTerm ref={xtermRef} />
+      
+      <table>
+        <thead>
+          <tr>
+           
+            <th>Event</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {workflowRuns.map(workflowRun => (
+            <tr key={workflowRun.id}>
+              <td>{workflowRun.id}</td>
+              <td>{workflowRun.event}</td>
+              <td>{workflowRun.status}</td>
+              <td>{workflowRun.doration}</td>
+
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h2>Artifacts</h2>
+      <ul>
+        {artifacts.map((artifact) => (
+          <li key={artifact.id}>
+            <a
+              href={artifact.archive_download_url}
+              download={`${artifact.name}.zip`}
+            >
+              {artifact.name}
+            </a>
+          </li>
+        ))}
+      </ul>
+
+    </div>
+    
+
+    
+  );
 }
+
 export default App;
-
-
